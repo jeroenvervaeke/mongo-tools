@@ -45,11 +45,15 @@ import (
 // condition key to control who can create a ReadWrite or ReadOnly session. A
 // ReadWrite session is required for executing all the Zonal endpoint API
 // operations, including RenameObject . For more information about authorization,
-// see [CreateSession]CreateSession . To learn more about Zonal endpoint APT operations, see [Authorizing Zonal endpoint API operations with CreateSession] in
+// see [CreateSession]CreateSession . To learn more about Zonal endpoint API operations, see [Authorizing Zonal endpoint API operations with CreateSession] in
 // the Amazon S3 User Guide.
 //
 // HTTP Host header syntax  Directory buckets - The HTTP Host header syntax is
 // Bucket-name.s3express-zone-id.region-code.amazonaws.com .
+//
+// You must URL encode any signed header values that contain spaces. For example,
+// if your header value is my file.txt , containing two spaces after my , you must
+// URL encode this value to my%20%20file.txt .
 //
 // [CreateSession]: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateSession.html
 // [RFC 7232]: https://datatracker.ietf.org/doc/rfc7232/
@@ -97,14 +101,16 @@ type RenameObjectInput struct {
 	RenameSource *string
 
 	//  A unique string with a max of 64 ASCII characters in the ASCII range of 33 -
-	// 126. RenameObject supports idempotency using a client token. To make an
-	// idempotent API request using RenameObject , specify a client token in the
-	// request. You should not reuse the same client token for other API requests. If
-	// you retry a request that completed successfully using the same client token and
-	// the same parameters, the retry succeeds without performing any further actions.
-	// If you retry a successful request using the same client token, but one or more
-	// of the parameters are different, the retry fails and an
-	// IdempotentParameterMismatch error is returned.
+	// 126.
+	//
+	// RenameObject supports idempotency using a client token. To make an idempotent
+	// API request using RenameObject , specify a client token in the request. You
+	// should not reuse the same client token for other API requests. If you retry a
+	// request that completed successfully using the same client token and the same
+	// parameters, the retry succeeds without performing any further actions. If you
+	// retry a successful request using the same client token, but one or more of the
+	// parameters are different, the retry fails and an IdempotentParameterMismatch
+	// error is returned.
 	ClientToken *string
 
 	// Renames the object only if the ETag (entity tag) value provided during the
@@ -275,16 +281,13 @@ func (c *Client) addOperationRenameObjectMiddlewares(stack *middleware.Stack, op
 	if err = addSerializeImmutableHostnameBucketMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = addSpanInitializeStart(stack); err != nil {
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
 		return err
 	}
-	if err = addSpanInitializeEnd(stack); err != nil {
+	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
-	if err = addSpanBuildRequestStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestEnd(stack); err != nil {
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil
